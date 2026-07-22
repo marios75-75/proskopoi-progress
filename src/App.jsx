@@ -39,6 +39,14 @@ function Trefoil({ fillPct = 0, size = 34, color = "#1B4332" }) {
 function Pill({ children, tone }) {
   return <span style={{ background: tone.bg, color: tone.fg, border: `1px solid ${tone.border}33`, borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}>{children}</span>;
 }
+function LevelBadge({ level, cfg }) {
+  if (!level) return null;
+  return (
+    <span title="Επίπεδο δυσκολίας" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 20, height: 20, padding: "0 5px", borderRadius: 6, background: cfg.primary_color + "14", color: cfg.primary_color, fontSize: 11, fontWeight: 700 }}>
+      Ε{level}
+    </span>
+  );
+}
 function Card({ children, style }) {
   return <div style={{ background: "#fff", border: "1px solid #E4E0D3", borderRadius: 14, padding: 18, ...style }}>{children}</div>;
 }
@@ -313,7 +321,9 @@ function ScoutView({ cfg, user, requirements, getProgressFor, onStart, onSubmit 
                       <Card key={r.id} style={{ padding: "12px 14px" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                           <div>
-                            <div style={{ fontWeight: 600, fontSize: 14 }}>{r.title}</div>
+                            <div style={{ fontWeight: 600, fontSize: 14, display: "flex", alignItems: "center", gap: 7 }}>
+                              <LevelBadge level={r.level} cfg={cfg} /> {r.title}
+                            </div>
                             {p?.comment && status === "Απορρίφθηκε" && <div style={{ fontSize: 12, color: "#8B3A3A", marginTop: 3 }}>Σχόλιο: {p.comment}</div>}
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -516,10 +526,14 @@ function AdminCatalog({ cfg, requirements, onAdd, onDelete }) {
           <button onClick={() => setOpenStage(openStage === sk ? null : sk)} style={{ width: "100%", textAlign: "left", background: "#fff", border: "1px solid #E4E0D3", borderRadius: 10, padding: "10px 14px", display: "flex", justifyContent: "space-between", cursor: "pointer", fontWeight: 700, fontSize: 14 }}>
             {STAGES[i]} <span style={{ display: "flex", gap: 4, fontWeight: 400, fontSize: 12, color: "#8A8577" }}>{requirements.filter((r) => r.stage === sk).length} απαιτήσεις {openStage === sk ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>
           </button>
-          {openStage === sk && <div style={{ padding: "8px 4px", display: "flex", flexDirection: "column", gap: 6 }}>{requirements.filter((r) => r.stage === sk).map((r) => (
-            <div key={r.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 10px", background: "#fff", border: "1px solid #EDEAE0", borderRadius: 8 }}>
-              <div style={{ fontSize: 13 }}>{r.title} <span style={{ color: "#8A8577" }}>· {r.category}</span></div>
-              <button onClick={() => onDelete(r.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#8B3A3A" }}><Trash2 size={14} /></button>
+          {openStage === sk && <div style={{ padding: "8px 4px", display: "flex", flexDirection: "column", gap: 6 }}>{requirements.filter((r) => r.stage === sk).sort((a,b) => (a.aa||0)-(b.aa||0)).map((r) => (
+            <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "8px 10px", background: "#fff", border: "1px solid #EDEAE0", borderRadius: 8 }}>
+              <div style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 7 }}>
+                <LevelBadge level={r.level} cfg={cfg} />
+                {r.aa && <span style={{ color: "#8A8577", fontSize: 11 }}>#{r.aa}</span>}
+                {r.title} <span style={{ color: "#8A8577" }}>· {r.category}</span>
+              </div>
+              <button onClick={() => onDelete(r.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#8B3A3A", flexShrink: 0 }}><Trash2 size={14} /></button>
             </div>
           ))}</div>}
         </div>
