@@ -201,6 +201,12 @@ function MainApp({ cfg, setCfg, me }) {
     await logAction(`Πρόσθεσε προφίλ: ${name} (${role})`);
     await loadAll();
   };
+  const leaderAddScout = async (uid, name) => {
+    const { error } = await supabase.from("profiles").insert({ id: uid, full_name: name, role: "scout", leader_id: me.id });
+    if (error) { alert("Σφάλμα: " + error.message); return; }
+    await logAction(`Πρόσθεσε πρόσκοπο στην ομάδα: ${name}`);
+    await loadAll();
+  };
   const toggleActive = async (id, active) => { await supabase.from("profiles").update({ active: !active }).eq("id", id); await loadAll(); };
   const removeUser = async (id) => { await supabase.from("profiles").delete().eq("id", id); await logAction("Διέγραψε χρήστη"); await loadAll(); };
   const transferAdmin = async (toId) => {
@@ -251,7 +257,7 @@ function MainApp({ cfg, setCfg, me }) {
           <ScoutView cfg={cfg} user={me} requirements={requirements} getProgressFor={getProgressFor} onStart={scoutStart} onSubmit={scoutSubmit} />
         )}
         {tab === "team" && me.role === "leader" && (
-          <LeaderTeamView cfg={cfg} scouts={scoutsOf(me.id)} requirements={requirements} getProgressFor={getProgressFor} />
+          <LeaderTeamView cfg={cfg} scouts={scoutsOf(me.id)} requirements={requirements} getProgressFor={getProgressFor} onAddScout={leaderAddScout} />
         )}
         {tab === "requests" && (me.role === "leader" || me.role === "admin") && (
           <RequestsView cfg={cfg} users={users} requirements={requirements} progress={progress}
@@ -347,10 +353,27 @@ function ScoutView({ cfg, user, requirements, getProgressFor, onStart, onSubmit 
 }
 
 /* ---------------- ΒΑΘΜΟΦΟΡΟΣ: ΟΜΑΔΑ ---------------- */
-function LeaderTeamView({ cfg, scouts, requirements, getProgressFor }) {
+function LeaderTeamView({ cfg, scouts, requirements, getProgressFor, onAddScout }) {
+  const [uidInput, setUidInput] = useState("");
+  const [nameInput, setNameInput] = useState("");
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <h2 style={{ fontSize: 18 }}>Η ομάδα μου ({scouts.length})</h2>
+
+      <Card style={{ background: "#FBF9F3" }}>
+        <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 13.5 }}>Προσθήκη προσκόπου στην ομάδα μου</div>
+        <div style={{ fontSize: 12, color: "#8A8577", marginBottom: 10 }}>
+          Ζήτησε από τον διαχειριστή να δημιουργήσει τον λογαριασμό (email + κωδικός) στο Supabase και να σου δώσει το User UID. Μετά τον συνδέεις εδώ, αυτόματα στη δική σου ομάδα.
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input placeholder="User UID" value={uidInput} onChange={(e) => setUidInput(e.target.value)} style={{ ...selStyle, minWidth: 220 }} />
+          <input placeholder="Ονοματεπώνυμο" value={nameInput} onChange={(e) => setNameInput(e.target.value)} style={{ ...selStyle, flex: 1, minWidth: 140 }} />
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <Button cfg={cfg} small icon={Plus} onClick={() => { if (uidInput.trim() && nameInput.trim()) { onAddScout(uidInput.trim(), nameInput.trim()); setUidInput(""); setNameInput(""); } }}>Προσθήκη</Button>
+        </div>
+      </Card>
+
       {scouts.length === 0 && <Card><div style={{ color: "#8A8577" }}>Δεν έχεις ακόμη προσκόπους στην ομάδα σου.</div></Card>}
       {scouts.map((s) => (
         <Card key={s.id}>
