@@ -264,6 +264,7 @@ function MainApp({ cfg, setCfg, me }) {
             scopeScouts={me.role === "admin" ? allScouts : scoutsOf(me.id)} onDecide={reviewerDecide} onManualAdd={managerAddDirect} />
         )}
         {tab === "overview" && me.role === "admin" && <AdminOverview cfg={cfg} users={users} requirements={requirements} progress={progress} />}
+        {tab === "scoutview" && me.role === "admin" && <AdminScoutDetail cfg={cfg} scouts={allScouts} requirements={requirements} getProgressFor={getProgressFor} />}
         {tab === "users" && me.role === "admin" && <AdminUsers cfg={cfg} users={users} me={me} onAdd={linkExistingUser} onToggle={toggleActive} onRemove={removeUser} onTransfer={transferAdmin} />}
         {tab === "catalog" && me.role === "admin" && <AdminCatalog cfg={cfg} requirements={requirements} onAdd={addRequirement} onDelete={deleteRequirement} />}
         {tab === "appearance" && me.role === "admin" && <AdminAppearance cfg={cfg} onSave={saveConfig} />}
@@ -278,6 +279,7 @@ function tabsFor(role) {
   if (role === "leader") return [{ key: "team", label: "Η ομάδα μου", icon: Users }, { key: "requests", label: "Αιτήματα", icon: ClipboardList }];
   return [
     { key: "overview", label: "Σύνοψη", icon: Shield },
+    { key: "scoutview", label: "Προφίλ Προσκόπου", icon: Award },
     { key: "requests", label: "Αιτήματα", icon: ClipboardList },
     { key: "users", label: "Χρήστες", icon: UserCog },
     { key: "catalog", label: "Απαιτήσεις", icon: Trash2 },
@@ -479,6 +481,79 @@ function AdminOverview({ cfg, users, requirements, progress }) {
     </div>
   );
 }
+function AdminScoutDetail({ cfg, scouts, requirements, getProgressFor }) {
+  const [scoutId, setScoutId] = useState(scouts[0]?.id || "");
+  const [openStage, setOpenStage] = useState(STAGE_KEYS[0]);
+  const scout = scouts.find((s) => s.id === scoutId);
+
+  if (scouts.length === 0) return <div><h2 style={{ fontSize: 18, marginBottom: 12 }}>Προφίλ Προσκόπου</h2><Card><div style={{ color: "#8A8577" }}>Δεν υπάρχουν ακόμη πρόσκοποι.</div></Card></div>;
+
+  return (
+    <div>
+      <h2 style={{ fontSize: 18, marginBottom: 12 }}>Προφίλ Προσκόπου</h2>
+      <select value={scoutId} onChange={(e) => setScoutId(e.target.value)} style={{ ...selStyle, marginBottom: 16, minWidth: 220 }}>
+        {scouts.map((s) => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+      </select>
+
+      {scout && (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px,1fr))", gap: 10, marginBottom: 18 }}>
+            {STAGE_KEYS.map((sk, i) => {
+              const reqs = requirements.filter((r) => r.stage === sk);
+              const done = reqs.filter((r) => getProgressFor(scout.id, r.id)?.status === "Εγκρίθηκε").length;
+              const pct = reqs.length ? Math.round((done / reqs.length) * 100) : 0;
+              const stageColor = [cfg.moss_color, cfg.bronze_color, cfg.silver_color, cfg.gold_color][i];
+              return (
+                <Card key={sk} style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer", border: openStage === sk ? `1.5px solid ${cfg.primary_color}` : "1px solid #E4E0D3" }}>
+                  <div onClick={() => setOpenStage(sk)} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
+                    <Trefoil fillPct={pct} color={stageColor} />
+                    <div><div style={{ fontWeight: 700, fontSize: 13.5 }}>{STAGES[i]}</div><div style={{ fontSize: 12, color: "#8A8577" }}>{done}/{reqs.length} · {pct}%</div></div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+
+          {STAGE_KEYS.filter((sk) => sk === openStage).map((sk) => {
+            const idx = STAGE_KEYS.indexOf(sk);
+            const reqs = requirements.filter((r) => r.stage === sk).sort((a, b) => (a.aa || 0) - (b.aa || 0));
+            const byCategory = {};
+            reqs.forEach((r) => { (byCategory[r.category] ||= []).push(r); });
+            return (
+              <div key={sk}>
+                <h3 style={{ fontSize: 16, margin: "6px 0 12px" }}>{STAGES[idx]}</h3>
+                {Object.entries(byCategory).map(([cat, list]) => (
+                  <div key={cat} style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#8A8577", textTransform: "uppercase", marginBottom: 6 }}>{cat}</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {list.map((r) => {
+                        const p = getProgressFor(scout.id, r.id);
+                        const status = p?.status || "Δεν ξεκίνησε";
+                        const tone = statusColor(status, cfg);
+                        return (
+                          <Card key={r.id} style={{ padding: "10px 14px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                              <div style={{ fontSize: 13.5, display: "flex", alignItems: "center", gap: 7 }}>
+                                <LevelBadge level={r.level} cfg={cfg} /> {r.title}
+                                {p?.comment && <span style={{ color: "#8A8577", marginLeft: 4 }}>· "{p.comment}"</span>}
+                              </div>
+                              <Pill tone={tone}><StatusIcon status={status} />{status}</Pill>
+                            </div>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </>
+      )}
+    </div>
+  );
+}
+
 function AdminUsers({ cfg, users, me, onAdd, onToggle, onRemove, onTransfer }) {
   const [uidInput, setUidInput] = useState("");
   const [name, setName] = useState("");
