@@ -6,7 +6,8 @@ import * as XLSX from "xlsx";
 import {
   Check, X, Clock, Circle, ChevronRight, ChevronDown, Plus, Trash2,
   Users, Settings, ClipboardList, Award, ArrowLeftRight, History,
-  Shield, UserCog, Sprout, LogOut, Bell, Paperclip, FileDown, Edit3, Save
+  Shield, UserCog, Sprout, LogOut, Bell, Paperclip, FileDown, Edit3, Save,
+  Mail, Lock, Eye, EyeOff, LogIn
 } from "lucide-react";
 
 const STAGES = ["Αρχάριος Πρόσκοπος", "Χάλκινο Τριφύλλι", "Αργυρό Τριφύλλι", "Χρυσό Τριφύλλι"];
@@ -127,7 +128,7 @@ function NotificationBell({ notifications, onOpen }) {
         {unread > 0 && <span style={{ position: "absolute", top: -4, right: -4, background: "#C0392B", color: "#fff", borderRadius: 999, fontSize: 10, fontWeight: 700, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{unread}</span>}
       </button>
       {open && (
-        <div style={{ position: "absolute", top: "115%", right: 0, width: 280, maxHeight: 320, overflowY: "auto", background: "#fff", border: "1px solid #E4E0D3", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,.12)", zIndex: 20 }}>
+        <div style={{ position: "fixed", top: 64, left: 12, right: 12, marginLeft: "auto", width: "auto", maxWidth: 320, maxHeight: "60vh", overflowY: "auto", background: "#fff", border: "1px solid #E4E0D3", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,.18)", zIndex: 50 }}>
           {notifications.length === 0 && <div style={{ padding: 14, fontSize: 13, color: "#8A8577" }}>Καμία ειδοποίηση.</div>}
           {notifications.map((n) => (
             <div key={n.id} style={{ padding: "10px 12px", borderBottom: "1px solid #F0EEE6", fontSize: 12.5, color: "#2B2A22" }}>
@@ -146,6 +147,7 @@ function NotificationBell({ notifications, onOpen }) {
 function Login({ cfg }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -157,17 +159,41 @@ function Login({ cfg }) {
     setLoading(false);
   };
 
+  const COLORS = { bg: "#F5F1E8", dark: "#1F513B", bright: "#367A55", gold: "#C79A3B", text: "#1E2A24", border: "#DDD6C8" };
+  const pattern = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%231F513B' stroke-width='1.4' opacity='0.05'%3E%3Cpath d='M60 18c-6 0-11 5-11 11 0 3 1.5 6 4 8-6 2-10 7-10 13 0 6 5 11 11 11 2.5 0 5-.8 6.9-2.2v5c0 5.5-2.3 9-6.9 11.4h12c-4.6-2.4-6.9-5.9-6.9-11.4v-5c1.9 1.4 4.4 2.2 6.9 2.2 6 0 11-5 11-11 0-6-4-11-10-13 2.5-2 4-5 4-8 0-6-5-11-11-11z'/%3E%3Ccircle cx='20' cy='95' r='10'/%3E%3Cpath d='M20 88v14M13 95h14'/%3E%3Cpath d='M95 100l10-14 10 14M95 100h20'/%3E%3C/g%3E%3C/svg%3E";
+
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: cfg.cream || "#F6F2E8", fontFamily: "Inter, sans-serif" }}>
-      <form onSubmit={submit} style={{ background: "#fff", padding: 28, borderRadius: 16, width: 320, border: "1px solid #E4E0D3" }}>
-        <div style={{ fontSize: 30, textAlign: "center" }}>{cfg.logo_emoji || "🌿"}</div>
-        <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 19, textAlign: "center", margin: "8px 0 18px" }}>{cfg.org_name || "Σύστημα Προσκόπων"}</h1>
-        <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ ...selStyle, width: "100%", marginBottom: 8 }} />
-        <input placeholder="Κωδικός" type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ ...selStyle, width: "100%", marginBottom: 12 }} />
-        {error && <div style={{ color: "#8B3A3A", fontSize: 12.5, marginBottom: 10 }}>{error}</div>}
-        <button disabled={loading} style={{ width: "100%", background: cfg.primary_color || "#1B4332", color: "#fff", border: "none", borderRadius: 10, padding: "10px", fontWeight: 700, cursor: "pointer" }}>
-          {loading ? "Σύνδεση…" : "Σύνδεση"}
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: COLORS.bg, backgroundImage: `url("${pattern}")`, fontFamily: "Inter, sans-serif", padding: 16 }}>
+      <form onSubmit={submit} style={{ background: "#fff", padding: "32px 30px", borderRadius: 20, width: "100%", maxWidth: 420, border: `1px solid ${COLORS.border}`, boxShadow: "0 10px 40px rgba(31,81,59,0.08)" }}>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+          <img src="/icon-192.png" alt="logo" style={{ width: 84, height: 84, borderRadius: 18, boxShadow: "0 4px 14px rgba(0,0,0,0.15)" }} />
+        </div>
+        <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, textAlign: "center", color: COLORS.text, margin: "0 0 4px" }}>Καλώς ήρθες</h1>
+        <div style={{ textAlign: "center", fontSize: 13.5, color: "#6B6656", marginBottom: 24 }}>Σύνδεση στο Σύστημα Προόδου Προσκόπων</div>
+
+        <div style={{ position: "relative", marginBottom: 12 }}>
+          <Mail size={17} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#8A8577" }} />
+          <input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+            style={{ width: "100%", height: 50, padding: "0 14px 0 40px", borderRadius: 12, border: `1px solid ${COLORS.border}`, fontSize: 14.5, color: COLORS.text, outline: "none" }} />
+        </div>
+        <div style={{ position: "relative", marginBottom: 8 }}>
+          <Lock size={17} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#8A8577" }} />
+          <input placeholder="Κωδικός" type={showPw ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)}
+            style={{ width: "100%", height: 50, padding: "0 42px 0 40px", borderRadius: 12, border: `1px solid ${COLORS.border}`, fontSize: 14.5, color: COLORS.text, outline: "none" }} />
+          <button type="button" onClick={() => setShowPw(!showPw)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#8A8577", padding: 4 }}>
+            {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
+          </button>
+        </div>
+
+        {error && <div style={{ color: "#8B3A3A", fontSize: 12.5, marginBottom: 10, marginTop: 4 }}>{error}</div>}
+
+        <button disabled={loading} style={{ width: "100%", height: 50, marginTop: 12, background: COLORS.bright, color: "#fff", border: "none", borderRadius: 12, fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          {loading ? "Σύνδεση…" : (<>Σύνδεση <LogIn size={17} /></>)}
         </button>
+
+        <div style={{ textAlign: "center", fontSize: 11.5, color: "#8A8577", marginTop: 22, letterSpacing: 0.2 }}>
+          75ον Σύστημα Αεροπροσκόπων Αγίου Δομετίου
+        </div>
       </form>
     </div>
   );
@@ -269,6 +295,12 @@ function MainApp({ cfg, setCfg, me }) {
     if (!userId) return;
     await supabase.from("notifications").insert({ user_id: userId, message });
   };
+  const notifyAdmins = async (message) => {
+    const { data: adminIds } = await supabase.rpc("list_admin_ids");
+    if (!adminIds) return;
+    const rows = adminIds.filter((id) => id !== me.id).map((id) => ({ user_id: id, message }));
+    if (rows.length) await supabase.from("notifications").insert(rows);
+  };
   const markNotificationsRead = async () => {
     const unreadIds = notifications.filter((n) => !n.read).map((n) => n.id);
     if (unreadIds.length === 0) return;
@@ -305,6 +337,7 @@ function MainApp({ cfg, setCfg, me }) {
     await upsertProgress(me.id, reqId, { status: "Αναμένει έγκριση", completed_date: today(), ...(proof_url ? { proof_url, proof_name } : {}) }, "Υποβλήθηκε για έγκριση");
     logAction("Υπέβαλε αίτημα έγκρισης");
     if (me.leader_id) notify(me.leader_id, `${me.full_name} υπέβαλε νέο αίτημα έγκρισης.`);
+    notifyAdmins(`${me.full_name} υπέβαλε νέο αίτημα έγκρισης.`);
   };
 
   const reviewerDecide = (scoutId, reqId, approve, comment) => {
@@ -315,11 +348,13 @@ function MainApp({ cfg, setCfg, me }) {
     }, approve ? "Εγκρίθηκε" : "Απορρίφθηκε");
     logAction(`${approve ? "Ενέκρινε" : "Απέρριψε"} αίτημα`);
     notify(scoutId, `Το αίτημά σου ${approve ? "εγκρίθηκε ✅" : "απορρίφθηκε ❌"}${comment ? ` — "${comment}"` : ""}`);
+    notifyAdmins(`${me.full_name} ${approve ? "ενέκρινε" : "απέρριψε"} ένα αίτημα.`);
   };
   const managerAddDirect = (scoutId, reqId, comment) => {
     upsertProgress(scoutId, reqId, { status: "Εγκρίθηκε", completed_date: today(), approved_date: today(), approved_by: me.id, comment: comment || "Χειροκίνητη καταχώρηση" }, "Καταχωρήθηκε χειροκίνητα");
     logAction("Καταχώρησε χειροκίνητα ολοκληρωμένη απαίτηση");
     notify(scoutId, "Καταχωρήθηκε ολοκληρωμένη απαίτηση από τον βαθμοφόρο/διαχειριστή σου.");
+    notifyAdmins(`${me.full_name} καταχώρησε χειροκίνητα μια ολοκληρωμένη απαίτηση.`);
   };
 
   const getProofUrl = async (path) => {
