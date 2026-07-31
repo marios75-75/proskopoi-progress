@@ -252,6 +252,19 @@ function MainApp({ cfg, setCfg, me }) {
   }, [me.id]);
   useEffect(() => { loadNotifications(); }, [loadNotifications]);
 
+  // Ζωντανή ενημέρωση ειδοποιήσεων (χωρίς refresh) μέσω Supabase Realtime
+  useEffect(() => {
+    const channel = supabase
+      .channel(`notifications-${me.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${me.id}` },
+        (payload) => setNotifications((prev) => [payload.new, ...prev])
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [me.id]);
+
   const notify = async (userId, message) => {
     if (!userId) return;
     await supabase.from("notifications").insert({ user_id: userId, message });
