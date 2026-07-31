@@ -160,7 +160,7 @@ function Login({ cfg }) {
   };
 
   const COLORS = { bg: "#F5F1E8", dark: "#1F513B", bright: "#367A55", gold: "#C79A3B", text: "#1E2A24", border: "#DDD6C8" };
-  const pattern = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260' viewBox='0 0 260 260'%3E%3Cg fill='none' stroke='%231F513B' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round' opacity='0.05'%3E%3Cg transform='translate(28,26)'%3E%3Ccircle cx='20' cy='20' r='18'/%3E%3Cpath d='M20 2v6M20 32v6M2 20h6M32 20h6'/%3E%3Cpath d='M20 10l5 10-5 10-5-10z'/%3E%3C/g%3E%3Cg transform='translate(150,18)'%3E%3Cpath d='M0 40 L20 4 L40 40 Z'/%3E%3Cpath d='M20 4 L20 40'/%3E%3Cpath d='M14 40 L20 27 L26 40'/%3E%3C/g%3E%3Cg transform='translate(28,150)'%3E%3Cpath d='M0 40 L38 40'/%3E%3Cpath d='M5 40 L27 21 M33 40 L11 21'/%3E%3Cpath d='M19 35c-4-4-4-9-1-13 1 4 3 5 3 5s2-6-2-11c7 2 10 9 8 15-1 3-3 4-3 4s3-1 4-4c1 4-1 8-5 9z'/%3E%3C/g%3E%3Cg transform='translate(165,150)'%3E%3Cpath d='M22 5c-3.5 0-6.4 2.7-6.4 6.2 0 1.8.9 3.5 2.3 4.6C14.1 17.4 11 20 11 23.4c0 3.5 2.9 6.2 6.4 6.2 1.4 0 2.7-.4 3.7-1.2v3c0 3.2-1.3 5.3-4 6.7h9.8c-2.7-1.4-4-3.5-4-6.7v-3c1 .8 2.3 1.2 3.7 1.2 3.5 0 6.4-2.7 6.4-6.2 0-3.4-2.6-6-5.9-7 1.4-1.1 2.3-2.8 2.3-4.6C29.4 7.7 26.5 5 23 5z'/%3E%3C/g%3E%3Cg transform='translate(200,55)'%3E%3Ccircle cx='9' cy='9' r='8'/%3E%3Ccircle cx='20' cy='16' r='8'/%3E%3C/g%3E%3Cg transform='translate(90,95)'%3E%3Crect x='0' y='7' width='24' height='30' rx='6'/%3E%3Cpath d='M4 7 C4 -1 20 -1 20 7'/%3E%3Crect x='6' y='15' width='12' height='10' rx='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E";
+  const pattern = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260' viewBox='0 0 260 260'%3E%3Cg fill='none' stroke='%231F513B' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round' opacity='0.3'%3E%3Cg transform='translate(28,26)'%3E%3Ccircle cx='20' cy='20' r='18'/%3E%3Cpath d='M20 2v6M20 32v6M2 20h6M32 20h6'/%3E%3Cpath d='M20 10l5 10-5 10-5-10z'/%3E%3C/g%3E%3Cg transform='translate(150,18)'%3E%3Cpath d='M0 40 L20 4 L40 40 Z'/%3E%3Cpath d='M20 4 L20 40'/%3E%3Cpath d='M14 40 L20 27 L26 40'/%3E%3C/g%3E%3Cg transform='translate(28,150)'%3E%3Cpath d='M0 40 L38 40'/%3E%3Cpath d='M5 40 L27 21 M33 40 L11 21'/%3E%3Cpath d='M19 35c-4-4-4-9-1-13 1 4 3 5 3 5s2-6-2-11c7 2 10 9 8 15-1 3-3 4-3 4s3-1 4-4c1 4-1 8-5 9z'/%3E%3C/g%3E%3Cg transform='translate(165,150)'%3E%3Cpath d='M22 5c-3.5 0-6.4 2.7-6.4 6.2 0 1.8.9 3.5 2.3 4.6C14.1 17.4 11 20 11 23.4c0 3.5 2.9 6.2 6.4 6.2 1.4 0 2.7-.4 3.7-1.2v3c0 3.2-1.3 5.3-4 6.7h9.8c-2.7-1.4-4-3.5-4-6.7v-3c1 .8 2.3 1.2 3.7 1.2 3.5 0 6.4-2.7 6.4-6.2 0-3.4-2.6-6-5.9-7 1.4-1.1 2.3-2.8 2.3-4.6C29.4 7.7 26.5 5 23 5z'/%3E%3C/g%3E%3Cg transform='translate(200,55)'%3E%3Ccircle cx='9' cy='9' r='8'/%3E%3Ccircle cx='20' cy='16' r='8'/%3E%3C/g%3E%3Cg transform='translate(90,95)'%3E%3Crect x='0' y='7' width='24' height='30' rx='6'/%3E%3Cpath d='M4 7 C4 -1 20 -1 20 7'/%3E%3Crect x='6' y='15' width='12' height='10' rx='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E";
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: COLORS.bg, backgroundImage: `url("${pattern}")`, fontFamily: "Inter, sans-serif", padding: 16 }}>
@@ -171,25 +171,27 @@ function Login({ cfg }) {
         <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, textAlign: "center", color: COLORS.text, margin: "0 0 4px" }}>Καλώς ήρθες</h1>
         <div style={{ textAlign: "center", fontSize: 13.5, color: "#6B6656", marginBottom: 24 }}>Σύνδεση στο Σύστημα Προόδου Προσκόπων</div>
 
-        <div style={{ position: "relative", marginBottom: 12 }}>
-          <Mail size={17} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#8A8577" }} />
-          <input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-            style={{ width: "100%", height: 50, padding: "0 14px 0 40px", borderRadius: 12, border: `1px solid ${COLORS.border}`, fontSize: 14.5, color: COLORS.text, outline: "none" }} />
-        </div>
-        <div style={{ position: "relative", marginBottom: 8 }}>
-          <Lock size={17} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#8A8577" }} />
-          <input placeholder="Κωδικός" type={showPw ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)}
-            style={{ width: "100%", height: 50, padding: "0 42px 0 40px", borderRadius: 12, border: `1px solid ${COLORS.border}`, fontSize: 14.5, color: COLORS.text, outline: "none" }} />
-          <button type="button" onClick={() => setShowPw(!showPw)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#8A8577", padding: 4 }}>
-            {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
+        <div style={{ maxWidth: 300, margin: "0 auto" }}>
+          <div style={{ position: "relative", marginBottom: 12 }}>
+            <Mail size={17} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#8A8577" }} />
+            <input placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+              style={{ width: "100%", height: 50, padding: "0 14px 0 40px", borderRadius: 12, border: `1px solid ${COLORS.border}`, fontSize: 14.5, color: COLORS.text, outline: "none", boxSizing: "border-box" }} />
+          </div>
+          <div style={{ position: "relative", marginBottom: 8 }}>
+            <Lock size={17} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#8A8577" }} />
+            <input placeholder="Κωδικός" type={showPw ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)}
+              style={{ width: "100%", height: 50, padding: "0 42px 0 40px", borderRadius: 12, border: `1px solid ${COLORS.border}`, fontSize: 14.5, color: COLORS.text, outline: "none", boxSizing: "border-box" }} />
+            <button type="button" onClick={() => setShowPw(!showPw)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#8A8577", padding: 4 }}>
+              {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
+            </button>
+          </div>
+
+          {error && <div style={{ color: "#8B3A3A", fontSize: 12.5, marginBottom: 10, marginTop: 4 }}>{error}</div>}
+
+          <button disabled={loading} style={{ width: "100%", height: 50, marginTop: 12, background: COLORS.bright, color: "#fff", border: "none", borderRadius: 12, fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxSizing: "border-box" }}>
+            {loading ? "Σύνδεση…" : (<>Σύνδεση <LogIn size={17} /></>)}
           </button>
         </div>
-
-        {error && <div style={{ color: "#8B3A3A", fontSize: 12.5, marginBottom: 10, marginTop: 4 }}>{error}</div>}
-
-        <button disabled={loading} style={{ width: "100%", height: 50, marginTop: 12, background: COLORS.bright, color: "#fff", border: "none", borderRadius: 12, fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-          {loading ? "Σύνδεση…" : (<>Σύνδεση <LogIn size={17} /></>)}
-        </button>
 
         <div style={{ textAlign: "center", fontSize: 11.5, color: "#8A8577", marginTop: 22, letterSpacing: 0.2 }}>
           75ον Σύστημα Αεροπροσκόπων Αγίου Δομετίου
