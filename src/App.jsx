@@ -14,6 +14,36 @@ const STAGES = ["Αρχάριος Πρόσκοπος", "Χάλκινο Τριφ�
 const STAGE_KEYS = ["arxarios", "xalkino", "argyro", "xryso"];
 const today = () => new Date().toISOString().slice(0, 10);
 
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
+async function subscribeToPush(userId) {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    alert("Η συσκευή/browser σου δεν υποστηρίζει push ειδοποιήσεις.");
+    return false;
+  }
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") return false;
+
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) {
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(import.meta.env.VITE_VAPID_PUBLIC_KEY),
+    });
+  }
+  const json = sub.toJSON();
+  await supabase.from("push_subscriptions").upsert({
+    user_id: userId, endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth,
+  }, { onConflict: "endpoint" });
+  return true;
+}
+
 function buildExportRows(scoutName, requirements, progressList, userMap) {
   return requirements
     .slice()
@@ -246,6 +276,23 @@ function MainApp({ cfg, setCfg, me }) {
   const [users, setUsers] = useState([]);
   const [activity, setActivity] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [pushEnabled, setPushEnabled] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      if ("serviceWorker" in navigator && "PushManager" in window) {
+        const reg = await navigator.serviceWorker.ready.catch(() => null);
+        if (reg) {
+          const sub = await reg.pushManager.getSubscription();
+          setPushEnabled(!!sub);
+        }
+      }
+    })();
+  }, []);
+  const enablePush = async () => {
+    const ok = await subscribeToPush(me.id);
+    setPushEnabled(ok);
+  };
 
   const loadAll = useCallback(async () => {
     const { data: reqs } = await supabase.from("requirements").select("*").order("stage");
@@ -405,6 +452,11 @@ function MainApp({ cfg, setCfg, me }) {
             <div><h1 style={{ fontSize: 19, lineHeight: 1.1 }}>{cfg.org_name}</h1><div style={{ fontSize: 12, opacity: 0.8 }}>{cfg.tagline}</div></div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {!pushEnabled && (
+              <button onClick={enablePush} title="Ενεργοποίηση ειδοποιήσεων συσκευής" style={{ background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.3)", borderRadius: 8, padding: "6px 10px", cursor: "pointer", color: "#fff", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
+                <Bell size={14} /> <span className="hide-sm">Ενεργοποίηση ειδοποιήσεων</span>
+              </button>
+            )}
             <NotificationBell notifications={notifications} onOpen={markNotificationsRead} />
             <span style={{ fontSize: 13 }} className="hide-sm">{me.full_name}</span>
             <button onClick={() => supabase.auth.signOut()} style={{ background: "rgba(255,255,255,.15)", color: "#fff", border: "1px solid rgba(255,255,255,.3)", borderRadius: 8, padding: "6px 10px", cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
