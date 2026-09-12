@@ -7,7 +7,7 @@ import {
   Check, X, Clock, Circle, ChevronRight, ChevronDown, Plus, Trash2,
   Users, Settings, ClipboardList, Award, ArrowLeftRight, History,
   Shield, UserCog, Sprout, LogOut, Bell, Paperclip, FileDown, Edit3, Save,
-  Mail, Lock, Eye, EyeOff, LogIn
+  Mail, Lock, Eye, EyeOff, LogIn, Star
 } from "lucide-react";
 
 const STAGES = ["Αρχάριος Πρόσκοπος", "Χάλκινο Τριφύλλι", "Αργυρό Τριφύλλι", "Χρυσό Τριφύλλι"];
@@ -273,6 +273,9 @@ function MainApp({ cfg, setCfg, me }) {
   const [tab, setTab] = useState(tabsFor(me.role)[0].key);
   const [requirements, setRequirements] = useState([]);
   const [progress, setProgress] = useState([]);
+  const [badges, setBadges] = useState([]);
+  const [badgeRequirements, setBadgeRequirements] = useState([]);
+  const [badgeProgress, setBadgeProgress] = useState([]);
   const [users, setUsers] = useState([]);
   const [activity, setActivity] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -298,9 +301,16 @@ function MainApp({ cfg, setCfg, me }) {
     const { data: reqs } = await supabase.from("requirements").select("*").order("stage");
     setRequirements(reqs || []);
 
+    const { data: bdgs } = await supabase.from("badges").select("*").order("category");
+    setBadges(bdgs || []);
+    const { data: bdgReqs } = await supabase.from("badge_requirements").select("*").order("position");
+    setBadgeRequirements(bdgReqs || []);
+
     if (me.role === "scout") {
       const { data: prog } = await supabase.from("progress").select("*").eq("scout_id", me.id);
       setProgress(prog || []);
+      const { data: bp } = await supabase.from("badge_progress").select("*").eq("scout_id", me.id);
+      setBadgeProgress(bp || []);
     } else if (me.role === "leader") {
       const { data: scouts } = await supabase.from("profiles").select("*").eq("leader_id", me.id).eq("role", "scout");
       setUsers(scouts || []);
@@ -308,12 +318,16 @@ function MainApp({ cfg, setCfg, me }) {
       if (ids.length) {
         const { data: prog } = await supabase.from("progress").select("*").in("scout_id", ids);
         setProgress(prog || []);
-      } else setProgress([]);
+        const { data: bp } = await supabase.from("badge_progress").select("*").in("scout_id", ids);
+        setBadgeProgress(bp || []);
+      } else { setProgress([]); setBadgeProgress([]); }
     } else if (me.role === "admin") {
       const { data: allUsers } = await supabase.from("profiles").select("*");
       setUsers(allUsers || []);
       const { data: prog } = await supabase.from("progress").select("*");
       setProgress(prog || []);
+      const { data: bp } = await supabase.from("badge_progress").select("*");
+      setBadgeProgress(bp || []);
       const { data: log } = await supabase.from("activity_log").select("*").order("ts", { ascending: false }).limit(100);
       setActivity(log || []);
     }
@@ -362,6 +376,7 @@ function MainApp({ cfg, setCfg, me }) {
   };
 
   const getProgressFor = (scoutId, reqId) => progress.find((p) => p.scout_id === scoutId && p.requirement_id === reqId);
+  const getBadgeProgressFor = (scoutId, badgeId) => badgeProgress.find((p) => p.scout_id === scoutId && p.badge_id === badgeId);
 
   const upsertProgress = async (scoutId, reqId, patch, note) => {
     const existing = getProgressFor(scoutId, reqId);
@@ -405,6 +420,52 @@ function MainApp({ cfg, setCfg, me }) {
     notify(scoutId, "Καταχωρήθηκε ολοκληρωμένη απαίτηση από τον βαθμοφόρο/διαχειριστή σου.");
     notifyAdmins(`${me.full_name} καταχώρησε χειροκίνητα μια ολοκληρωμένη απαίτηση.`);
   };
+
+  const upsertBadgeProgress = async (scoutId, badgeId, patch) => {
+    const row = { scout_id: scoutId, badge_id: badgeId, ...patch, updated_at: new Date().toISOString() };
+    await supabase.from("badge_progress").upsert(row, { onConflict: "scout_id,badge_id" });
+    await loadAll();
+  };
+
+  const badgeSubmit = async (badgeId, file) => {
+    let proof_url = null, proof_name = null;
+    if (file) {
+      const path = `${me.id}/badge-${badgeId}/${Date.now()}-${file.name}`;
+      const { error: upErr } = await supabase.storage.from("proof-files").upload(path, file);
+      if (upErr) { alert("Σφάλμα ανεβάσματος αρχείου: " + upErr.message); return; }
+      proof_url = path; proof_name = file.name;
+    }
+    await upsertBadgeProgress(me.id, badgeId, { status: "Αναμένει έγκριση", requested_date: today(), ...(proof_url ? { proof_url, proof_name } : {}) });
+    logAction("Υπέβαλε αίτημα έγκρισης πτυχίου");
+    if (me.leader_id) notify(me.leader_id, `${me.full_name} υπέβαλε αίτημα έγκρισης πτυχίου.`);
+    notifyAdmins(`${me.full_name} υπέβαλε αίτημα έγκρισης πτυχίου.`);
+  };
+  const badgeDecide = (scoutId, badgeId, approve, comment) => {
+    upsertBadgeProgress(scoutId, badgeId, {
+      status: approve ? "Εγκρίθηκε" : "Απορρίφθηκε",
+      approved_date: approve ? today() : null,
+      approved_by: me.id, comment: comment || "",
+    });
+    logAction(`${approve ? "Ενέκρινε" : "Απέρριψε"} αίτημα πτυχίου`);
+    notify(scoutId, `Το αίτημα πτυχίου σου ${approve ? "εγκρίθηκε ✅" : "απορρίφθηκε ❌"}${comment ? ` — "${comment}"` : ""}`);
+    notifyAdmins(`${me.full_name} ${approve ? "ενέκρινε" : "απέρριψε"} αίτημα πτυχίου.`);
+  };
+  const badgeManagerAddDirect = (scoutId, badgeId, comment) => {
+    upsertBadgeProgress(scoutId, badgeId, { status: "Εγκρίθηκε", requested_date: today(), approved_date: today(), approved_by: me.id, comment: comment || "Χειροκίνητη καταχώρηση" });
+    logAction("Καταχώρησε χειροκίνητα ολοκληρωμένο πτυχίο");
+    notify(scoutId, "Καταχωρήθηκε ολοκληρωμένο πτυχίο από τον βαθμοφόρο/διαχειριστή σου.");
+    notifyAdmins(`${me.full_name} καταχώρησε χειροκίνητα ολοκληρωμένο πτυχίο.`);
+  };
+
+  const addBadge = async (name, category) => { await supabase.from("badges").insert({ name, category }); await logAction(`Πρόσθεσε πτυχίο: ${name}`); await loadAll(); };
+  const editBadge = async (id, patch) => { await supabase.from("badges").update(patch).eq("id", id); await loadAll(); };
+  const deleteBadge = async (id) => { await supabase.from("badges").delete().eq("id", id); await loadAll(); };
+  const addBadgeRequirement = async (badgeId, text) => {
+    const pos = badgeRequirements.filter((r) => r.badge_id === badgeId).length;
+    await supabase.from("badge_requirements").insert({ badge_id: badgeId, text, position: pos });
+    await loadAll();
+  };
+  const deleteBadgeRequirement = async (id) => { await supabase.from("badge_requirements").delete().eq("id", id); await loadAll(); };
 
   const getProofUrl = async (path) => {
     const { data, error } = await supabase.storage.from("proof-files").createSignedUrl(path, 3600);
@@ -480,17 +541,24 @@ function MainApp({ cfg, setCfg, me }) {
         {tab === "progress" && me.role === "scout" && (
           <ScoutView cfg={cfg} user={me} requirements={requirements} getProgressFor={getProgressFor} onStart={scoutStart} onSubmit={scoutSubmit} getProofUrl={getProofUrl} />
         )}
+        {tab === "badges" && me.role === "scout" && (
+          <ScoutBadgesView cfg={cfg} user={me} badges={badges} badgeRequirements={badgeRequirements} getBadgeProgressFor={getBadgeProgressFor} onSubmit={badgeSubmit} getProofUrl={getProofUrl} />
+        )}
         {tab === "team" && me.role === "leader" && (
           <LeaderTeamView cfg={cfg} scouts={scoutsOf(me.id)} requirements={requirements} getProgressFor={getProgressFor} onAddScout={leaderAddScout} />
         )}
         {tab === "requests" && (me.role === "leader" || me.role === "admin") && (
           <RequestsView cfg={cfg} users={users} requirements={requirements} progress={progress}
-            scopeScouts={me.role === "admin" ? allScouts : scoutsOf(me.id)} onDecide={reviewerDecide} onManualAdd={managerAddDirect} getProofUrl={getProofUrl} />
+            badges={badges} badgeProgress={badgeProgress}
+            scopeScouts={me.role === "admin" ? allScouts : scoutsOf(me.id)} onDecide={reviewerDecide} onManualAdd={managerAddDirect}
+            onBadgeDecide={badgeDecide} onBadgeManualAdd={badgeManagerAddDirect} getProofUrl={getProofUrl} />
         )}
         {tab === "overview" && me.role === "admin" && <AdminOverview cfg={cfg} users={users} requirements={requirements} progress={progress} />}
         {tab === "scoutview" && me.role === "admin" && <AdminScoutDetail cfg={cfg} scouts={allScouts} requirements={requirements} progress={progress} users={users} getProgressFor={getProgressFor} getProofUrl={getProofUrl} />}
+        {tab === "badgeview" && me.role === "admin" && <AdminBadgeDetail cfg={cfg} scouts={allScouts} badges={badges} badgeRequirements={badgeRequirements} getBadgeProgressFor={getBadgeProgressFor} getProofUrl={getProofUrl} />}
         {tab === "users" && me.role === "admin" && <AdminUsers cfg={cfg} users={users} me={me} onAdd={linkExistingUser} onToggle={toggleActive} onRemove={removeUser} onTransfer={transferAdmin} />}
         {tab === "catalog" && me.role === "admin" && <AdminCatalog cfg={cfg} requirements={requirements} onAdd={addRequirement} onEdit={editRequirement} onDelete={deleteRequirement} />}
+        {tab === "badgecatalog" && me.role === "admin" && <AdminBadgeCatalog cfg={cfg} badges={badges} badgeRequirements={badgeRequirements} onAddBadge={addBadge} onEditBadge={editBadge} onDeleteBadge={deleteBadge} onAddReq={addBadgeRequirement} onDeleteReq={deleteBadgeRequirement} />}
         {tab === "appearance" && me.role === "admin" && <AdminAppearance cfg={cfg} onSave={saveConfig} />}
         {tab === "log" && me.role === "admin" && <AdminLog activity={activity} />}
       </div>
@@ -499,14 +567,19 @@ function MainApp({ cfg, setCfg, me }) {
 }
 
 function tabsFor(role) {
-  if (role === "scout") return [{ key: "progress", label: "Η πρόοδός μου", icon: Award }];
+  if (role === "scout") return [
+    { key: "progress", label: "Η πρόοδός μου", icon: Award },
+    { key: "badges", label: "Πτυχία", icon: Star },
+  ];
   if (role === "leader") return [{ key: "team", label: "Η ομάδα μου", icon: Users }, { key: "requests", label: "Αιτήματα", icon: ClipboardList }];
   return [
     { key: "overview", label: "Σύνοψη", icon: Shield },
     { key: "scoutview", label: "Προφίλ Προσκόπου", icon: Award },
+    { key: "badgeview", label: "Πτυχία Προσκόπου", icon: Star },
     { key: "requests", label: "Αιτήματα", icon: ClipboardList },
     { key: "users", label: "Χρήστες", icon: UserCog },
     { key: "catalog", label: "Απαιτήσεις", icon: Trash2 },
+    { key: "badgecatalog", label: "Κατάλογος Πτυχίων", icon: Star },
     { key: "appearance", label: "Εμφάνιση", icon: Settings },
     { key: "log", label: "Ιστορικό", icon: History },
   ];
@@ -610,6 +683,95 @@ function ScoutRequirementCard({ cfg, r, p, onStart, onSubmit, getProofUrl }) {
   );
 }
 
+/* ---------------- ΠΤΥΧΙΑ (ΠΡΟΣΚΟΠΟΣ) ---------------- */
+function ScoutBadgesView({ cfg, user, badges, badgeRequirements, getBadgeProgressFor, onSubmit, getProofUrl }) {
+  const [openId, setOpenId] = useState(null);
+  const byCategory = {};
+  badges.forEach((b) => { (byCategory[b.category || "Γενικά"] ||= []).push(b); });
+
+  return (
+    <div>
+      <h2 style={{ fontSize: 18, marginBottom: 14 }}>Πτυχία</h2>
+      {badges.length === 0 && <Card><div style={{ color: "#8A8577" }}>Δεν έχουν προστεθεί ακόμη πτυχία.</div></Card>}
+      {Object.entries(byCategory).map(([cat, list]) => (
+        <div key={cat} style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#8A8577", textTransform: "uppercase", marginBottom: 8 }}>{cat}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {list.map((b) => {
+              const reqs = badgeRequirements.filter((r) => r.badge_id === b.id);
+              const p = getBadgeProgressFor(user.id, b.id);
+              const status = p?.status || "Δεν ξεκίνησε";
+              const tone = statusColor(status, cfg);
+              const isOpen = openId === b.id;
+              return (
+                <Card key={b.id} style={{ padding: 0, overflow: "hidden" }}>
+                  <button onClick={() => setOpenId(isOpen ? null : b.id)} style={{ width: "100%", textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 600, fontSize: 14 }}>
+                      <Star size={15} color={cfg.gold_color} /> {b.name}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <Pill tone={tone}><StatusIcon status={status} />{status}</Pill>
+                      {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    </div>
+                  </button>
+                  {isOpen && (
+                    <div style={{ padding: "0 14px 14px" }}>
+                      {b.description && <div style={{ fontSize: 12.5, color: "#6B6656", marginBottom: 10 }}>{b.description}</div>}
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#8A8577", textTransform: "uppercase", marginBottom: 6 }}>Απαιτήσεις</div>
+                      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13.5, color: "#2B2A22", display: "flex", flexDirection: "column", gap: 4 }}>
+                        {reqs.map((r) => <li key={r.id}>{r.text}</li>)}
+                        {reqs.length === 0 && <li style={{ color: "#8A8577" }}>Δεν έχουν καταχωρηθεί απαιτήσεις.</li>}
+                      </ul>
+                      {p?.comment && status === "Απορρίφθηκε" && <div style={{ fontSize: 12, color: "#8B3A3A", marginTop: 8 }}>Σχόλιο: {p.comment}</div>}
+                      {p?.proof_url && (
+                        <button onClick={async () => { const url = await getProofUrl(p.proof_url); if (url) window.open(url, "_blank"); }} style={{ marginTop: 8, background: "none", border: "none", padding: 0, color: cfg.moss_color, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                          <Paperclip size={12} /> {p.proof_name || "Αποδεικτικό αρχείο"}
+                        </button>
+                      )}
+                      <BadgeSubmitControl cfg={cfg} badgeId={b.id} status={status} onSubmit={onSubmit} />
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BadgeSubmitControl({ cfg, badgeId, status, onSubmit }) {
+  const [attaching, setAttaching] = useState(false);
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  if (status === "Εγκρίθηκε" || status === "Αναμένει έγκριση") return null;
+
+  const confirm = async () => {
+    setBusy(true);
+    await onSubmit(badgeId, file);
+    setBusy(false); setAttaching(false); setFile(null);
+  };
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      {!attaching ? (
+        <Button cfg={cfg} small onClick={() => setAttaching(true)}>Υποβολή αιτήματος για το πτυχίο</Button>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, background: "#FBF9F3", padding: 10, borderRadius: 8 }}>
+          <div style={{ fontSize: 12, color: "#8A8577" }}>Προαιρετικά επισύναψε φωτογραφία ή αρχείο (Word, PowerPoint, PDF) ως αποδεικτικό.</div>
+          <input type="file" accept="image/*,.pdf,.doc,.docx,.ppt,.pptx" onChange={(e) => setFile(e.target.files?.[0] || null)} style={{ fontSize: 12.5 }} />
+          <div style={{ display: "flex", gap: 8 }}>
+            <Button cfg={cfg} small disabled={busy} onClick={confirm}>{busy ? "Υποβολή…" : "Επιβεβαίωση υποβολής"}</Button>
+            <Button cfg={cfg} small variant="subtle" onClick={() => { setAttaching(false); setFile(null); }}>Άκυρο</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------------- ΒΑΘΜΟΦΟΡΟΣ: ΟΜΑΔΑ ---------------- */
 function LeaderTeamView({ cfg, scouts, requirements, getProgressFor, onAddScout }) {
   const [uidInput, setUidInput] = useState("");
@@ -652,15 +814,21 @@ function LeaderTeamView({ cfg, scouts, requirements, getProgressFor, onAddScout 
 }
 
 /* ---------------- ΑΙΤΗΜΑΤΑ ---------------- */
-function RequestsView({ cfg, users, requirements, progress, scopeScouts, onDecide, onManualAdd, getProofUrl }) {
+function RequestsView({ cfg, users, requirements, progress, badges, badgeProgress, scopeScouts, onDecide, onManualAdd, onBadgeDecide, onBadgeManualAdd, getProofUrl }) {
   const [commentDraft, setCommentDraft] = useState({});
+  const [badgeCommentDraft, setBadgeCommentDraft] = useState({});
   const [manualPicker, setManualPicker] = useState(null);
+  const [badgeManualPicker, setBadgeManualPicker] = useState(null);
   const scoutIds = new Set(scopeScouts.map((s) => s.id));
   const pending = progress.filter((p) => p.status === "Αναμένει έγκριση" && scoutIds.has(p.scout_id));
   const history = progress.filter((p) => (p.status === "Εγκρίθηκε" || p.status === "Απορρίφθηκε") && scoutIds.has(p.scout_id)).sort((a, b) => (b.approved_date || "").localeCompare(a.approved_date || ""));
   const reqMap = Object.fromEntries(requirements.map((r) => [r.id, r]));
   const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
   const viewProof = async (path) => { const url = await getProofUrl(path); if (url) window.open(url, "_blank"); };
+
+  const badgePending = (badgeProgress || []).filter((p) => p.status === "Αναμένει έγκριση" && scoutIds.has(p.scout_id));
+  const badgeHistory = (badgeProgress || []).filter((p) => (p.status === "Εγκρίθηκε" || p.status === "Απορρίφθηκε") && scoutIds.has(p.scout_id)).sort((a, b) => (b.approved_date || "").localeCompare(a.approved_date || ""));
+  const badgeMap = Object.fromEntries((badges || []).map((b) => [b.id, b]));
 
   return (
     <div>
@@ -702,6 +870,65 @@ function RequestsView({ cfg, users, requirements, progress, scopeScouts, onDecid
           const req = reqMap[p.requirement_id]; const scout = userMap[p.scout_id]; const tone = statusColor(p.status, cfg);
           return <Card key={p.id} style={{ padding: "10px 14px", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}><div style={{ fontSize: 13 }}><b>{scout?.full_name}</b> — {req?.title}</div><Pill tone={tone}><StatusIcon status={p.status} />{p.status}</Pill></Card>;
         })}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "32px 0 12px" }}>
+        <h2 style={{ fontSize: 18, display: "flex", alignItems: "center", gap: 7 }}><Star size={17} color={cfg.gold_color} /> Αιτήματα πτυχίων σε αναμονή ({badgePending.length})</h2>
+        <Button cfg={cfg} variant="subtle" small icon={Plus} onClick={() => setBadgeManualPicker({})}>Χειροκίνητη καταχώρηση</Button>
+      </div>
+      {badgeManualPicker && (
+        <Card style={{ marginBottom: 14, background: "#FBF9F3" }}>
+          <BadgeManualAddForm cfg={cfg} scouts={scopeScouts} badges={badges || []} onCancel={() => setBadgeManualPicker(null)}
+            onSubmit={(scoutId, badgeId, comment) => { onBadgeManualAdd(scoutId, badgeId, comment); setBadgeManualPicker(null); }} />
+        </Card>
+      )}
+      {badgePending.length === 0 && <Card><div style={{ color: "#8A8577" }}>Κανένα εκκρεμές αίτημα πτυχίου.</div></Card>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {badgePending.map((p) => {
+          const badge = badgeMap[p.badge_id]; const scout = userMap[p.scout_id];
+          return (
+            <Card key={p.id}>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>{badge?.name}</div>
+              <div style={{ fontSize: 12, color: "#8A8577" }}>{scout?.full_name} · υποβλήθηκε {p.requested_date}</div>
+              {p.proof_url && (
+                <button onClick={() => viewProof(p.proof_url)} style={{ marginTop: 6, background: "none", border: "none", padding: 0, color: cfg.moss_color, fontSize: 12.5, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                  <Paperclip size={13} /> {p.proof_name || "Προβολή αποδεικτικού"}
+                </button>
+              )}
+              <input placeholder="Σχόλιο (προαιρετικό)…" value={badgeCommentDraft[p.id] || ""} onChange={(e) => setBadgeCommentDraft({ ...badgeCommentDraft, [p.id]: e.target.value })} style={{ width: "100%", marginTop: 10, ...selStyle }} />
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <Button cfg={cfg} small icon={Check} onClick={() => onBadgeDecide(p.scout_id, p.badge_id, true, badgeCommentDraft[p.id])}>Έγκριση</Button>
+                <Button cfg={cfg} small variant="danger" icon={X} onClick={() => onBadgeDecide(p.scout_id, p.badge_id, false, badgeCommentDraft[p.id])}>Απόρριψη</Button>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+      <h3 style={{ fontSize: 15, margin: "22px 0 10px" }}>Ιστορικό αποφάσεων πτυχίων</h3>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {badgeHistory.slice(0, 15).map((p) => {
+          const badge = badgeMap[p.badge_id]; const scout = userMap[p.scout_id]; const tone = statusColor(p.status, cfg);
+          return <Card key={p.id} style={{ padding: "10px 14px", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}><div style={{ fontSize: 13 }}><b>{scout?.full_name}</b> — {badge?.name}</div><Pill tone={tone}><StatusIcon status={p.status} />{p.status}</Pill></Card>;
+        })}
+      </div>
+    </div>
+  );
+}
+function BadgeManualAddForm({ cfg, scouts, badges, onSubmit, onCancel }) {
+  const [scoutId, setScoutId] = useState(scouts[0]?.id || "");
+  const [badgeId, setBadgeId] = useState(badges[0]?.id || "");
+  const [comment, setComment] = useState("");
+  return (
+    <div>
+      <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 13.5 }}>Καταχώρηση ολοκληρωμένου πτυχίου</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <select value={scoutId} onChange={(e) => setScoutId(e.target.value)} style={selStyle}>{scouts.map((s) => <option key={s.id} value={s.id}>{s.full_name}</option>)}</select>
+        <select value={badgeId} onChange={(e) => setBadgeId(e.target.value)} style={{ ...selStyle, flex: 1, minWidth: 180 }}>{badges.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>
+      </div>
+      <input placeholder="Σχόλιο (προαιρετικό)" value={comment} onChange={(e) => setComment(e.target.value)} style={{ width: "100%", marginTop: 8, ...selStyle }} />
+      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+        <Button cfg={cfg} small onClick={() => scoutId && badgeId && onSubmit(scoutId, badgeId, comment)}>Καταχώρηση</Button>
+        <Button cfg={cfg} small variant="subtle" onClick={onCancel}>Άκυρο</Button>
       </div>
     </div>
   );
@@ -843,6 +1070,52 @@ function AdminScoutDetail({ cfg, scouts, requirements, progress, users, getProgr
   );
 }
 
+function AdminBadgeDetail({ cfg, scouts, badges, badgeRequirements, getBadgeProgressFor, getProofUrl }) {
+  const [scoutId, setScoutId] = useState(scouts[0]?.id || "");
+  const scout = scouts.find((s) => s.id === scoutId);
+
+  if (scouts.length === 0) return <div><h2 style={{ fontSize: 18, marginBottom: 12 }}>Πτυχία Προσκόπου</h2><Card><div style={{ color: "#8A8577" }}>Δεν υπάρχουν ακόμη πρόσκοποι.</div></Card></div>;
+
+  return (
+    <div>
+      <h2 style={{ fontSize: 18, marginBottom: 12 }}>Πτυχία Προσκόπου</h2>
+      <select value={scoutId} onChange={(e) => setScoutId(e.target.value)} style={{ ...selStyle, marginBottom: 16, minWidth: 220 }}>
+        {scouts.map((s) => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+      </select>
+      {scout && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {badges.length === 0 && <Card><div style={{ color: "#8A8577" }}>Δεν έχουν προστεθεί ακόμη πτυχία.</div></Card>}
+          {badges.map((b) => {
+            const reqs = badgeRequirements.filter((r) => r.badge_id === b.id);
+            const p = getBadgeProgressFor(scout.id, b.id);
+            const status = p?.status || "Δεν ξεκίνησε";
+            const tone = statusColor(status, cfg);
+            return (
+              <Card key={b.id}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, fontWeight: 700, fontSize: 14 }}><Star size={15} color={cfg.gold_color} /> {b.name}</div>
+                  <Pill tone={tone}><StatusIcon status={status} />{status}</Pill>
+                </div>
+                {reqs.length > 0 && (
+                  <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 12.5, color: "#6B6656" }}>
+                    {reqs.map((r) => <li key={r.id}>{r.text}</li>)}
+                  </ul>
+                )}
+                {p?.comment && <div style={{ fontSize: 12, color: "#8A8577", marginTop: 6 }}>Σχόλιο: {p.comment}</div>}
+                {p?.proof_url && (
+                  <button onClick={async () => { const url = await getProofUrl(p.proof_url); if (url) window.open(url, "_blank"); }} style={{ marginTop: 6, background: "none", border: "none", padding: 0, color: cfg.moss_color, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                    <Paperclip size={12} /> {p.proof_name || "Αποδεικτικό αρχείο"}
+                  </button>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminUsers({ cfg, users, me, onAdd, onToggle, onRemove, onTransfer }) {
   const [uidInput, setUidInput] = useState("");
   const [name, setName] = useState("");
@@ -951,6 +1224,84 @@ function AdminCatalog({ cfg, requirements, onAdd, onEdit, onDelete }) {
     </div>
   );
 }
+function AdminBadgeCatalog({ cfg, badges, badgeRequirements, onAddBadge, onEditBadge, onDeleteBadge, onAddReq, onDeleteReq }) {
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState("");
+  const [openId, setOpenId] = useState(null);
+  const [reqDraft, setReqDraft] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState({});
+
+  const startEdit = (b) => { setEditingId(b.id); setEditDraft({ name: b.name, category: b.category, description: b.description || "" }); };
+  const saveEdit = (id) => { onEditBadge(id, editDraft); setEditingId(null); };
+
+  return (
+    <div>
+      <h2 style={{ fontSize: 18, marginBottom: 12 }}>Κατάλογος Πτυχίων</h2>
+      <Card style={{ marginBottom: 16, background: "#FBF9F3" }}>
+        <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 13.5 }}>Νέο πτυχίο</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input placeholder="Κατηγορία (π.χ. Τεχνικά)" value={category} onChange={(e) => setCategory(e.target.value)} style={selStyle} />
+          <input placeholder="Όνομα πτυχίου" value={name} onChange={(e) => setName(e.target.value)} style={{ ...selStyle, flex: 1, minWidth: 180 }} />
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <Button cfg={cfg} small icon={Plus} onClick={() => { if (name.trim()) { onAddBadge(name.trim(), category.trim() || "Γενικά"); setName(""); } }}>Προσθήκη πτυχίου</Button>
+        </div>
+      </Card>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {badges.map((b) => {
+          const reqs = badgeRequirements.filter((r) => r.badge_id === b.id);
+          const isOpen = openId === b.id;
+          const isEditing = editingId === b.id;
+          return (
+            <Card key={b.id} style={{ padding: 0, overflow: "hidden" }}>
+              {isEditing ? (
+                <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 6, background: "#FBF9F3" }}>
+                  <input value={editDraft.name} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} style={selStyle} placeholder="Όνομα" />
+                  <input value={editDraft.category} onChange={(e) => setEditDraft({ ...editDraft, category: e.target.value })} style={selStyle} placeholder="Κατηγορία" />
+                  <input value={editDraft.description} onChange={(e) => setEditDraft({ ...editDraft, description: e.target.value })} style={selStyle} placeholder="Περιγραφή (προαιρετικό)" />
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <Button cfg={cfg} small icon={Save} onClick={() => saveEdit(b.id)}>Αποθήκευση</Button>
+                    <Button cfg={cfg} small variant="subtle" onClick={() => setEditingId(null)}>Άκυρο</Button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setOpenId(isOpen ? null : b.id)} style={{ width: "100%", textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: 14 }}><Star size={15} color={cfg.gold_color} /> {b.name} <span style={{ fontWeight: 400, color: "#8A8577", fontSize: 12 }}>· {b.category}</span></div>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <span style={{ fontSize: 12, color: "#8A8577" }}>{reqs.length} απαιτήσεις</span>
+                    <span onClick={(e) => { e.stopPropagation(); startEdit(b); }} style={{ color: cfg.primary_color, cursor: "pointer" }}><Edit3 size={14} /></span>
+                    <span onClick={(e) => { e.stopPropagation(); onDeleteBadge(b.id); }} style={{ color: "#8B3A3A", cursor: "pointer" }}><Trash2 size={14} /></span>
+                    {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  </div>
+                </button>
+              )}
+              {isOpen && !isEditing && (
+                <div style={{ padding: "0 14px 14px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+                    {reqs.map((r) => (
+                      <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 10px", background: "#fff", border: "1px solid #EDEAE0", borderRadius: 8, fontSize: 13 }}>
+                        {r.text}
+                        <button onClick={() => onDeleteReq(r.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#8B3A3A" }}><Trash2 size={13} /></button>
+                      </div>
+                    ))}
+                    {reqs.length === 0 && <div style={{ fontSize: 12.5, color: "#8A8577" }}>Δεν υπάρχουν ακόμη απαιτήσεις.</div>}
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input placeholder="Νέα απαίτηση…" value={openId === b.id ? reqDraft : ""} onChange={(e) => setReqDraft(e.target.value)} style={{ ...selStyle, flex: 1 }} />
+                    <Button cfg={cfg} small icon={Plus} onClick={() => { if (reqDraft.trim()) { onAddReq(b.id, reqDraft.trim()); setReqDraft(""); } }}>Προσθήκη</Button>
+                  </div>
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function AdminAppearance({ cfg, onSave }) {
   const [local, setLocal] = useState(cfg);
   return (
