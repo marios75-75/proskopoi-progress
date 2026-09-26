@@ -7,7 +7,7 @@ import {
   Check, X, Clock, Circle, ChevronRight, ChevronDown, Plus, Trash2,
   Users, Settings, ClipboardList, Award, ArrowLeftRight, History,
   Shield, UserCog, Sprout, LogOut, Bell, Paperclip, FileDown, Edit3, Save,
-  Mail, Lock, Eye, EyeOff, LogIn, Star
+  Mail, Lock, Eye, EyeOff, LogIn, Star, Medal
 } from "lucide-react";
 
 const STAGES = ["Αρχάριος Πρόσκοπος", "Χάλκινο Τριφύλλι", "Αργυρό Τριφύλλι", "Χρυσό Τριφύλλι"];
@@ -94,6 +94,56 @@ async function exportToPDF(filename, title, rows) {
     headStyles: { fillColor: [27, 67, 50], font: "DejaVu" },
   });
   doc.save(filename);
+}
+
+/* ---------------- ΑΝΩΤΕΡΕΣ ΔΙΑΚΡΙΣΕΙΣ (λογική επιλεξιμότητας) ---------------- */
+const SPECIALTY_CATEGORIES = ["Πτυχία Ειδικότητας Προσκόπων", "Πτυχία Ειδικότητας Ναυτοπροσκόπων", "Πτυχία Ειδικότητας Αεροπροσκόπων"];
+const CATEGORY_BUCKETS = [
+  { label: "Πτυχία Δράσης", match: (c) => c === "Πτυχία Δράσης" },
+  { label: "Πτυχία Προσκοπικής Τεχνικής", match: (c) => c === "Πτυχία Προσκοπικής Τεχνικής" },
+  { label: "Πτυχία Τεχνολογίας", match: (c) => c === "Πτυχία Τεχνολογίας" },
+  { label: "Πτυχία Προσωπικής Ανάπτυξης", match: (c) => c === "Πτυχία Προσωπικής Ανάπτυξης" },
+  { label: "Πτυχία Προσφοράς Υπηρεσίας", match: (c) => c === "Πτυχία Προσφοράς Υπηρεσίας" },
+  { label: "Πτυχία Ψυχαγωγίας", match: (c) => c === "Πτυχία Ψυχαγωγίας" },
+  { label: "Πτυχία Ειδικότητας (οποιαδήποτε)", match: (c) => SPECIALTY_CATEGORIES.includes(c) },
+];
+const SPECIALIZATION_NAMED_BADGES = ["Κατασκηνωτής", "Εξερευνητής", "Σκαπανικής", "Κατασκηνωτικής Τεχνικής", "Πρώτων Βοηθειών - Επίπεδο 2"];
+const DISTINCTIONS = [
+  { key: "silver_laurel", name: "Αργυρή Δάφνη", image: "/distinctions/silver-laurel.png" },
+  { key: "gold_laurel", name: "Χρυσή Δάφνη", image: "/distinctions/gold-laurel.png" },
+  { key: "specialization", name: "Πτυχίο Εξειδίκευσης", image: "/distinctions/specialization.png" },
+];
+function isStageComplete(scoutId, stageKey, requirements, progress) {
+  const reqs = requirements.filter((r) => r.stage === stageKey);
+  if (reqs.length === 0) return false;
+  return reqs.every((r) => progress.find((p) => p.scout_id === scoutId && p.requirement_id === r.id)?.status === "Εγκρίθηκε");
+}
+function getApprovedBadges(scoutId, badges, badgeProgress) {
+  const approvedIds = new Set(badgeProgress.filter((p) => p.scout_id === scoutId && p.status === "Εγκρίθηκε").map((p) => p.badge_id));
+  return badges.filter((b) => approvedIds.has(b.id));
+}
+function computeDistinctionCriteria(key, scoutId, { requirements, progress, badges, badgeProgress }) {
+  const approvedBadges = getApprovedBadges(scoutId, badges, badgeProgress);
+  const criteria = [];
+  if (key === "silver_laurel") {
+    criteria.push({ label: `Ολοκληρωμένο στάδιο: ${STAGES[STAGE_KEYS.indexOf("argyro")]}`, met: isStageComplete(scoutId, "argyro", requirements, progress) });
+    CATEGORY_BUCKETS.forEach((b) => criteria.push({ label: `Τουλάχιστον 1 εγκεκριμένο πτυχίο — ${b.label}`, met: approvedBadges.filter((bd) => b.match(bd.category)).length >= 1 }));
+  } else if (key === "gold_laurel") {
+    criteria.push({ label: `Ολοκληρωμένο στάδιο: ${STAGES[STAGE_KEYS.indexOf("xryso")]}`, met: isStageComplete(scoutId, "xryso", requirements, progress) });
+    CATEGORY_BUCKETS.forEach((b) => criteria.push({ label: `Τουλάχιστον 2 εγκεκριμένα πτυχία — ${b.label}`, met: approvedBadges.filter((bd) => b.match(bd.category)).length >= 2 }));
+  } else if (key === "specialization") {
+    criteria.push({ label: `Ολοκληρωμένο στάδιο: ${STAGES[STAGE_KEYS.indexOf("argyro")]}`, met: isStageComplete(scoutId, "argyro", requirements, progress) });
+    SPECIALIZATION_NAMED_BADGES.forEach((name) => criteria.push({ label: `Εγκεκριμένο πτυχίο: ${name}`, met: approvedBadges.some((bd) => bd.name === name) }));
+    criteria.push({ label: "Τουλάχιστον 2 εγκεκριμένα πτυχία ειδικότητας (οποιαδήποτε)", met: approvedBadges.filter((bd) => SPECIALTY_CATEGORIES.includes(bd.category)).length >= 2 });
+  }
+  return criteria;
+}
+function distinctionTone(label, cfg) {
+  if (label === "Εγκρίθηκε") return statusColor("Εγκρίθηκε", cfg);
+  if (label === "Απορρίφθηκε") return statusColor("Απορρίφθηκε", cfg);
+  if (label === "Αναμένει έγκριση") return statusColor("Αναμένει έγκριση", cfg);
+  if (label === "Έτοιμο για υποβολή") return statusColor("Σε εξέλιξη", cfg);
+  return statusColor("Δεν ξεκίνησε", cfg);
 }
 
 function statusColor(status, cfg) {
@@ -276,6 +326,7 @@ function MainApp({ cfg, setCfg, me }) {
   const [badges, setBadges] = useState([]);
   const [badgeRequirements, setBadgeRequirements] = useState([]);
   const [badgeProgress, setBadgeProgress] = useState([]);
+  const [distinctionProgress, setDistinctionProgress] = useState([]);
   const [users, setUsers] = useState([]);
   const [activity, setActivity] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -311,6 +362,8 @@ function MainApp({ cfg, setCfg, me }) {
       setProgress(prog || []);
       const { data: bp } = await supabase.from("badge_progress").select("*").eq("scout_id", me.id);
       setBadgeProgress(bp || []);
+      const { data: dp } = await supabase.from("distinction_progress").select("*").eq("scout_id", me.id);
+      setDistinctionProgress(dp || []);
     } else if (me.role === "leader") {
       const { data: scouts } = await supabase.from("profiles").select("*").eq("leader_id", me.id).eq("role", "scout");
       setUsers(scouts || []);
@@ -320,7 +373,9 @@ function MainApp({ cfg, setCfg, me }) {
         setProgress(prog || []);
         const { data: bp } = await supabase.from("badge_progress").select("*").in("scout_id", ids);
         setBadgeProgress(bp || []);
-      } else { setProgress([]); setBadgeProgress([]); }
+        const { data: dp } = await supabase.from("distinction_progress").select("*").in("scout_id", ids);
+        setDistinctionProgress(dp || []);
+      } else { setProgress([]); setBadgeProgress([]); setDistinctionProgress([]); }
     } else if (me.role === "admin") {
       const { data: allUsers } = await supabase.from("profiles").select("*");
       setUsers(allUsers || []);
@@ -328,6 +383,8 @@ function MainApp({ cfg, setCfg, me }) {
       setProgress(prog || []);
       const { data: bp } = await supabase.from("badge_progress").select("*");
       setBadgeProgress(bp || []);
+      const { data: dp } = await supabase.from("distinction_progress").select("*");
+      setDistinctionProgress(dp || []);
       const { data: log } = await supabase.from("activity_log").select("*").order("ts", { ascending: false }).limit(100);
       setActivity(log || []);
     }
@@ -467,6 +524,36 @@ function MainApp({ cfg, setCfg, me }) {
   };
   const deleteBadgeRequirement = async (id) => { await supabase.from("badge_requirements").delete().eq("id", id); await loadAll(); };
 
+  const getDistinctionProgressFor = (scoutId, key) => distinctionProgress.find((p) => p.scout_id === scoutId && p.distinction_key === key);
+
+  const upsertDistinctionProgress = async (scoutId, key, patch) => {
+    const row = { scout_id: scoutId, distinction_key: key, ...patch, updated_at: new Date().toISOString() };
+    await supabase.from("distinction_progress").upsert(row, { onConflict: "scout_id,distinction_key" });
+    await loadAll();
+  };
+  const distinctionSubmit = async (key) => {
+    await upsertDistinctionProgress(me.id, key, { status: "Αναμένει έγκριση", requested_date: today() });
+    logAction("Υπέβαλε αίτημα για ανώτερη διάκριση");
+    if (me.leader_id) notify(me.leader_id, `${me.full_name} υπέβαλε αίτημα για ανώτερη διάκριση.`);
+    notifyAdmins(`${me.full_name} υπέβαλε αίτημα για ανώτερη διάκριση.`);
+  };
+  const distinctionDecide = (scoutId, key, approve, comment) => {
+    upsertDistinctionProgress(scoutId, key, {
+      status: approve ? "Εγκρίθηκε" : "Απορρίφθηκε",
+      approved_date: approve ? today() : null,
+      approved_by: me.id, comment: comment || "",
+    });
+    logAction(`${approve ? "Ενέκρινε" : "Απέρριψε"} αίτημα ανώτερης διάκρισης`);
+    notify(scoutId, `Το αίτημά σου για ανώτερη διάκριση ${approve ? "εγκρίθηκε ✅" : "απορρίφθηκε ❌"}${comment ? ` — "${comment}"` : ""}`);
+    notifyAdmins(`${me.full_name} ${approve ? "ενέκρινε" : "απέρριψε"} αίτημα ανώτερης διάκρισης.`);
+  };
+  const distinctionManagerAddDirect = (scoutId, key, comment) => {
+    upsertDistinctionProgress(scoutId, key, { status: "Εγκρίθηκε", requested_date: today(), approved_date: today(), approved_by: me.id, comment: comment || "Χειροκίνητη καταχώρηση" });
+    logAction("Καταχώρησε χειροκίνητα ανώτερη διάκριση");
+    notify(scoutId, "Καταχωρήθηκε ανώτερη διάκριση από τον βαθμοφόρο/διαχειριστή σου.");
+    notifyAdmins(`${me.full_name} καταχώρησε χειροκίνητα ανώτερη διάκριση.`);
+  };
+
   const getProofUrl = async (path) => {
     const { data, error } = await supabase.storage.from("proof-files").createSignedUrl(path, 3600);
     if (error) { alert("Δεν ήταν δυνατή η ανάκτηση του αρχείου."); return null; }
@@ -544,14 +631,20 @@ function MainApp({ cfg, setCfg, me }) {
         {tab === "badges" && me.role === "scout" && (
           <ScoutBadgesView cfg={cfg} user={me} badges={badges} badgeRequirements={badgeRequirements} getBadgeProgressFor={getBadgeProgressFor} onSubmit={badgeSubmit} getProofUrl={getProofUrl} />
         )}
+        {tab === "distinctions" && me.role === "scout" && (
+          <ScoutDistinctionsView cfg={cfg} user={me} requirements={requirements} progress={progress} badges={badges} badgeProgress={badgeProgress} getDistinctionProgressFor={getDistinctionProgressFor} onSubmit={distinctionSubmit} />
+        )}
         {tab === "team" && me.role === "leader" && (
           <LeaderTeamView cfg={cfg} scouts={scoutsOf(me.id)} requirements={requirements} getProgressFor={getProgressFor} onAddScout={leaderAddScout} />
         )}
         {tab === "requests" && (me.role === "leader" || me.role === "admin") && (
           <RequestsView cfg={cfg} users={users} requirements={requirements} progress={progress}
             badges={badges} badgeProgress={badgeProgress}
+            distinctionProgress={distinctionProgress}
             scopeScouts={me.role === "admin" ? allScouts : scoutsOf(me.id)} onDecide={reviewerDecide} onManualAdd={managerAddDirect}
-            onBadgeDecide={badgeDecide} onBadgeManualAdd={badgeManagerAddDirect} getProofUrl={getProofUrl} />
+            onBadgeDecide={badgeDecide} onBadgeManualAdd={badgeManagerAddDirect}
+            onDistinctionDecide={distinctionDecide} onDistinctionManualAdd={distinctionManagerAddDirect}
+            getProofUrl={getProofUrl} />
         )}
         {tab === "overview" && me.role === "admin" && <AdminOverview cfg={cfg} users={users} requirements={requirements} progress={progress} />}
         {tab === "scoutview" && me.role === "admin" && <AdminScoutDetail cfg={cfg} scouts={allScouts} requirements={requirements} progress={progress} users={users} getProgressFor={getProgressFor} getProofUrl={getProofUrl} />}
@@ -570,6 +663,7 @@ function tabsFor(role) {
   if (role === "scout") return [
     { key: "progress", label: "Η πρόοδός μου", icon: Award },
     { key: "badges", label: "Πτυχία", icon: Star },
+    { key: "distinctions", label: "Ανώτερες Διακρίσεις", icon: Medal },
   ];
   if (role === "leader") return [{ key: "team", label: "Η ομάδα μου", icon: Users }, { key: "requests", label: "Αιτήματα", icon: ClipboardList }];
   return [
@@ -772,6 +866,59 @@ function BadgeSubmitControl({ cfg, badgeId, status, onSubmit }) {
   );
 }
 
+/* ---------------- ΑΝΩΤΕΡΕΣ ΔΙΑΚΡΙΣΕΙΣ (ΠΡΟΣΚΟΠΟΣ) ---------------- */
+function ScoutDistinctionsView({ cfg, user, requirements, progress, badges, badgeProgress, getDistinctionProgressFor, onSubmit }) {
+  const [busyKey, setBusyKey] = useState(null);
+  const submit = async (key) => { setBusyKey(key); await onSubmit(key); setBusyKey(null); };
+  return (
+    <div>
+      <h2 style={{ fontSize: 18, marginBottom: 6 }}>Ανώτερες Διακρίσεις</h2>
+      <div style={{ fontSize: 12.5, color: "#8A8577", marginBottom: 14 }}>Τα κριτήρια ελέγχονται αυτόματα με βάση την πρόοδό σου. Όταν πληρούνται όλα, μπορείς να υποβάλεις αίτημα έγκρισης.</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {DISTINCTIONS.map((d) => {
+          const criteria = computeDistinctionCriteria(d.key, user.id, { requirements, progress, badges, badgeProgress });
+          const allMet = criteria.every((c) => c.met);
+          const p = getDistinctionProgressFor(user.id, d.key);
+          const label = p?.status || (allMet ? "Έτοιμο για υποβολή" : "Δεν πληρούνται ακόμη τα κριτήρια");
+          const iconStatus = p?.status || (allMet ? "Σε εξέλιξη" : "Δεν ξεκίνησε");
+          const tone = distinctionTone(label, cfg);
+          const canSubmit = allMet && !p;
+          return (
+            <Card key={d.key}>
+              <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
+                <img src={d.image} alt={d.name} style={{ width: 72, height: 72, objectFit: "contain", borderRadius: 10, background: "#F6F2E8", border: "1px solid #E4E0D3", padding: 6 }} />
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>{d.name}</div>
+                    <Pill tone={tone}><StatusIcon status={iconStatus} />{label}</Pill>
+                  </div>
+                  <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 5 }}>
+                    {criteria.map((c, i) => (
+                      <div key={i} style={{ fontSize: 12.5, display: "flex", alignItems: "center", gap: 7, color: c.met ? "#2B2A22" : "#8A8577" }}>
+                        {c.met ? <Check size={14} color={cfg.moss_color || "#367A55"} /> : <X size={14} color="#B7B2A2" />}
+                        {c.label}
+                      </div>
+                    ))}
+                  </div>
+                  {p?.comment && p.status === "Απορρίφθηκε" && <div style={{ fontSize: 12, color: "#8B3A3A", marginTop: 8 }}>Σχόλιο: {p.comment}</div>}
+                  {canSubmit && (
+                    <div style={{ marginTop: 12 }}>
+                      <Button cfg={cfg} small disabled={busyKey === d.key} onClick={() => submit(d.key)}>{busyKey === d.key ? "Υποβολή…" : "Υποβολή αιτήματος"}</Button>
+                    </div>
+                  )}
+                  {!allMet && !p && (
+                    <div style={{ marginTop: 8, fontSize: 11.5, color: "#8A8577" }}>Το κουμπί υποβολής θα ενεργοποιηθεί όταν πληρούνται όλα τα κριτήρια.</div>
+                  )}
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- ΒΑΘΜΟΦΟΡΟΣ: ΟΜΑΔΑ ---------------- */
 function LeaderTeamView({ cfg, scouts, requirements, getProgressFor, onAddScout }) {
   const [uidInput, setUidInput] = useState("");
@@ -814,11 +961,13 @@ function LeaderTeamView({ cfg, scouts, requirements, getProgressFor, onAddScout 
 }
 
 /* ---------------- ΑΙΤΗΜΑΤΑ ---------------- */
-function RequestsView({ cfg, users, requirements, progress, badges, badgeProgress, scopeScouts, onDecide, onManualAdd, onBadgeDecide, onBadgeManualAdd, getProofUrl }) {
+function RequestsView({ cfg, users, requirements, progress, badges, badgeProgress, distinctionProgress, scopeScouts, onDecide, onManualAdd, onBadgeDecide, onBadgeManualAdd, onDistinctionDecide, onDistinctionManualAdd, getProofUrl }) {
   const [commentDraft, setCommentDraft] = useState({});
   const [badgeCommentDraft, setBadgeCommentDraft] = useState({});
+  const [distinctionCommentDraft, setDistinctionCommentDraft] = useState({});
   const [manualPicker, setManualPicker] = useState(null);
   const [badgeManualPicker, setBadgeManualPicker] = useState(null);
+  const [distinctionManualPicker, setDistinctionManualPicker] = useState(null);
   const scoutIds = new Set(scopeScouts.map((s) => s.id));
   const pending = progress.filter((p) => p.status === "Αναμένει έγκριση" && scoutIds.has(p.scout_id));
   const history = progress.filter((p) => (p.status === "Εγκρίθηκε" || p.status === "Απορρίφθηκε") && scoutIds.has(p.scout_id)).sort((a, b) => (b.approved_date || "").localeCompare(a.approved_date || ""));
@@ -829,6 +978,10 @@ function RequestsView({ cfg, users, requirements, progress, badges, badgeProgres
   const badgePending = (badgeProgress || []).filter((p) => p.status === "Αναμένει έγκριση" && scoutIds.has(p.scout_id));
   const badgeHistory = (badgeProgress || []).filter((p) => (p.status === "Εγκρίθηκε" || p.status === "Απορρίφθηκε") && scoutIds.has(p.scout_id)).sort((a, b) => (b.approved_date || "").localeCompare(a.approved_date || ""));
   const badgeMap = Object.fromEntries((badges || []).map((b) => [b.id, b]));
+
+  const distinctionPending = (distinctionProgress || []).filter((p) => p.status === "Αναμένει έγκριση" && scoutIds.has(p.scout_id));
+  const distinctionHistory = (distinctionProgress || []).filter((p) => (p.status === "Εγκρίθηκε" || p.status === "Απορρίφθηκε") && scoutIds.has(p.scout_id)).sort((a, b) => (b.approved_date || "").localeCompare(a.approved_date || ""));
+  const distinctionMap = Object.fromEntries(DISTINCTIONS.map((d) => [d.key, d]));
 
   return (
     <div>
@@ -910,6 +1063,62 @@ function RequestsView({ cfg, users, requirements, progress, badges, badgeProgres
           const badge = badgeMap[p.badge_id]; const scout = userMap[p.scout_id]; const tone = statusColor(p.status, cfg);
           return <Card key={p.id} style={{ padding: "10px 14px", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}><div style={{ fontSize: 13 }}><b>{scout?.full_name}</b> — {badge?.name}</div><Pill tone={tone}><StatusIcon status={p.status} />{p.status}</Pill></Card>;
         })}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "32px 0 12px" }}>
+        <h2 style={{ fontSize: 18, display: "flex", alignItems: "center", gap: 7 }}><Medal size={17} color={cfg.gold_color} /> Αιτήματα ανώτερων διακρίσεων σε αναμονή ({distinctionPending.length})</h2>
+        <Button cfg={cfg} variant="subtle" small icon={Plus} onClick={() => setDistinctionManualPicker({})}>Χειροκίνητη καταχώρηση</Button>
+      </div>
+      {distinctionManualPicker && (
+        <Card style={{ marginBottom: 14, background: "#FBF9F3" }}>
+          <DistinctionManualAddForm cfg={cfg} scouts={scopeScouts} onCancel={() => setDistinctionManualPicker(null)}
+            onSubmit={(scoutId, key, comment) => { onDistinctionManualAdd(scoutId, key, comment); setDistinctionManualPicker(null); }} />
+        </Card>
+      )}
+      {distinctionPending.length === 0 && <Card><div style={{ color: "#8A8577" }}>Κανένα εκκρεμές αίτημα ανώτερης διάκρισης.</div></Card>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {distinctionPending.map((p) => {
+          const d = distinctionMap[p.distinction_key]; const scout = userMap[p.scout_id];
+          return (
+            <Card key={p.id}>
+              <div style={{ fontWeight: 700, fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
+                {d?.image && <img src={d.image} alt="" style={{ width: 28, height: 28, objectFit: "contain" }} />} {d?.name}
+              </div>
+              <div style={{ fontSize: 12, color: "#8A8577" }}>{scout?.full_name} · υποβλήθηκε {p.requested_date}</div>
+              <input placeholder="Σχόλιο (προαιρετικό)…" value={distinctionCommentDraft[p.id] || ""} onChange={(e) => setDistinctionCommentDraft({ ...distinctionCommentDraft, [p.id]: e.target.value })} style={{ width: "100%", marginTop: 10, ...selStyle }} />
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <Button cfg={cfg} small icon={Check} onClick={() => onDistinctionDecide(p.scout_id, p.distinction_key, true, distinctionCommentDraft[p.id])}>Έγκριση</Button>
+                <Button cfg={cfg} small variant="danger" icon={X} onClick={() => onDistinctionDecide(p.scout_id, p.distinction_key, false, distinctionCommentDraft[p.id])}>Απόρριψη</Button>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+      <h3 style={{ fontSize: 15, margin: "22px 0 10px" }}>Ιστορικό αποφάσεων ανώτερων διακρίσεων</h3>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {distinctionHistory.slice(0, 15).map((p) => {
+          const d = distinctionMap[p.distinction_key]; const scout = userMap[p.scout_id]; const tone = statusColor(p.status, cfg);
+          return <Card key={p.id} style={{ padding: "10px 14px", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}><div style={{ fontSize: 13 }}><b>{scout?.full_name}</b> — {d?.name}</div><Pill tone={tone}><StatusIcon status={p.status} />{p.status}</Pill></Card>;
+        })}
+      </div>
+    </div>
+  );
+}
+function DistinctionManualAddForm({ cfg, scouts, onSubmit, onCancel }) {
+  const [scoutId, setScoutId] = useState(scouts[0]?.id || "");
+  const [key, setKey] = useState(DISTINCTIONS[0].key);
+  const [comment, setComment] = useState("");
+  return (
+    <div>
+      <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 13.5 }}>Καταχώρηση ανώτερης διάκρισης</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <select value={scoutId} onChange={(e) => setScoutId(e.target.value)} style={selStyle}>{scouts.map((s) => <option key={s.id} value={s.id}>{s.full_name}</option>)}</select>
+        <select value={key} onChange={(e) => setKey(e.target.value)} style={{ ...selStyle, flex: 1, minWidth: 180 }}>{DISTINCTIONS.map((d) => <option key={d.key} value={d.key}>{d.name}</option>)}</select>
+      </div>
+      <input placeholder="Σχόλιο (προαιρετικό)" value={comment} onChange={(e) => setComment(e.target.value)} style={{ width: "100%", marginTop: 8, ...selStyle }} />
+      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+        <Button cfg={cfg} small onClick={() => scoutId && key && onSubmit(scoutId, key, comment)}>Καταχώρηση</Button>
+        <Button cfg={cfg} small variant="subtle" onClick={onCancel}>Άκυρο</Button>
       </div>
     </div>
   );
